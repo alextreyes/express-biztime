@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
+const slugify = require("slugify");
 
 // GET /companies : Returns list of companies
 router.get("/", async (req, res, next) => {
@@ -12,15 +13,15 @@ router.get("/", async (req, res, next) => {
   }
 });
 
-// GET /companies/[code] : Return obj of company
+// GET /companies/[code] - Return obj of company
 router.get("/:code", async (req, res, next) => {
   try {
     const { code } = req.params;
 
     const companyResult = await db.query(
       `SELECT code, name, description 
-         FROM companies 
-         WHERE code = $1`,
+       FROM companies 
+       WHERE code = $1`,
       [code]
     );
 
@@ -30,13 +31,22 @@ router.get("/:code", async (req, res, next) => {
 
     const invoicesResult = await db.query(
       `SELECT id 
-         FROM invoices 
-         WHERE comp_code = $1`,
+       FROM invoices 
+       WHERE comp_code = $1`,
+      [code]
+    );
+
+    const industriesResult = await db.query(
+      `SELECT industry 
+       FROM industries_companies AS ic
+       JOIN industries AS i ON ic.industry_code = i.code
+       WHERE company_code = $1`,
       [code]
     );
 
     const company = companyResult.rows[0];
     company.invoices = invoicesResult.rows.map((inv) => inv.id);
+    company.industries = industriesResult.rows.map((ind) => ind.industry);
 
     return res.json({ company });
   } catch (err) {
@@ -44,14 +54,19 @@ router.get("/:code", async (req, res, next) => {
   }
 });
 
-// POST /companies : Adds a company
+// POST /companies - Adds a company
 router.post("/", async (req, res, next) => {
   try {
-    const { code, name, description } = req.body;
+    const { name, description } = req.body;
+    const code = slugify(name, { lower: true, strict: true });
+
     const result = await db.query(
-      "INSERT INTO companies (code, name, description) VALUES ($1, $2, $3) RETURNING code, name, description",
+      `INSERT INTO companies (code, name, description) 
+       VALUES ($1, $2, $3)
+       RETURNING code, name, description`,
       [code, name, description]
     );
+
     return res.status(201).json({ company: result.rows[0] });
   } catch (err) {
     return next(err);

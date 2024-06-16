@@ -70,13 +70,19 @@ router.post("/", async (req, res, next) => {
 router.put("/:id", async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { amt } = req.body;
+    const { amt, paid } = req.body;
+
+    let paidDate = null;
+    if (paid) {
+      paidDate = new Date();
+    }
 
     const result = await db.query(
-      `UPDATE invoices SET amt=$1 
-       WHERE id=$2
+      `UPDATE invoices 
+       SET amt=$1, paid=$2, paid_date=$3 
+       WHERE id=$4
        RETURNING id, comp_code, amt, paid, add_date, paid_date`,
-      [amt, id]
+      [amt, paid, paidDate, id]
     );
 
     if (result.rows.length === 0) {
